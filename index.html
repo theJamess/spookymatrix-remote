@@ -121,6 +121,7 @@ h3{font-size:13px;color:var(--mut);font-weight:600;text-transform:uppercase;lett
   <div id="manage"></div>
 </section>
 <label class="chk" id="advrow" hidden><input type="checkbox" id="advanced">Advanced</label>
+<label class="chk"><input type="checkbox" id="awake">Keep screen on while this is open</label>
 <p class="mut">Uploading clips, renaming and panel setup are on the Wi-Fi remote: join <b>SpookyMatrix</b> and open 192.168.4.1.</p>
 </main>
 <div id="toast" hidden></div>
@@ -133,8 +134,29 @@ let dev=null,cmdC=null,staC=null,clpC=null,rplC=null,S=null,gatt=Promise.resolve
 function toast(t){const e=$('toast');e.textContent=t;e.hidden=false;clearTimeout(e.t);e.t=setTimeout(()=>e.hidden=true,2500)}
 // Chrome allows one GATT operation at a time, so queue them.
 function queue(fn){const p=gatt.then(fn);gatt=p.catch(()=>{});return p}
-function send(cmd){if(!cmdC)return toast('Not connected');queue(()=>cmdC.writeValue(new TextEncoder().encode(cmd))).catch(e=>toast(e.message))}
-function refresh(){if(staC)queue(()=>staC.readValue()).then(v=>{S=JSON.parse(new TextDecoder().decode(v));render()}).catch(()=>{})}
+// Commands go out without waiting for an acknowledgement; if the link has died
+// (the phone slept), reconnect first and send then.
+async function send(cmd){
+  if(!cmdC||!dev||!dev.gatt.connected){
+    if(!dev)return toast('Not connected');
+    toast('Reconnecting…');
+    if(!await reconnectNow())return toast('Couldn’t reconnect');
+  }
+  const data=new TextEncoder().encode(cmd);
+  try{await queue(()=>cmdC.writeValueWithoutResponse?cmdC.writeValueWithoutResponse(data):cmdC.writeValue(data))}
+  catch(e){if(await reconnectNow())await queue(()=>cmdC.writeValue(data)).catch(x=>toast(x.message))}
+}
+// At most one status read at a time: notifications that arrive meanwhile just
+// ask for one more read afterwards, so commands never wait behind a backlog.
+let reading=false,readAgain=false;
+async function refresh(){
+  if(!staC)return;
+  if(reading){readAgain=true;return}
+  reading=true;
+  try{const v=await queue(()=>staC.readValue());S=JSON.parse(new TextDecoder().decode(v));render()}catch(e){}
+  reading=false;
+  if(readAgain){readAgain=false;refresh()}
+}
 
 async function attach(){
   $('sub').textContent='Connecting…';
@@ -189,14 +211,34 @@ $('linkgo').onclick=async()=>{
 };
 $('pin').onkeydown=e=>{if(e.key==='Enter')$('linkgo').click()};
 $('linkretry').onclick=async()=>{try{if(await login())linked()}catch(e){toast(e.message)}};
-async function reconnect(){
-  cmdC=staC=clpC=rplC=null;
-  showAdvanced();
-  for(let wait=1000;dev;wait=Math.min(wait*2,10000)){
-    $('sub').textContent='Connection lost, retrying…';
-    try{await attach();return}catch(e){}
-    await new Promise(r=>setTimeout(r,wait));
-  }
+let reconnecting=null;
+function reconnectNow(){  // one reconnect at a time; resolves true once usable again
+  if(!reconnecting)reconnecting=(async()=>{
+    cmdC=staC=clpC=rplC=null;showAdvanced();
+    for(let wait=500,tries=0;dev&&tries<8;wait=Math.min(wait*2,5000),tries++){
+      $('sub').textContent='Reconnecting…';
+      try{await attach();return !!cmdC}catch(e){}
+      await new Promise(r=>setTimeout(r,wait));
+    }
+    $('sub').textContent='Not connected: tap Connect';$('connect').hidden=false;
+    return false;
+  })().finally(()=>{reconnecting=null});
+  return reconnecting;
+}
+function reconnect(){reconnectNow()}
+// Back from a locked screen or another app: make sure we're still connected.
+document.addEventListener('visibilitychange',()=>{
+  if(document.visibilityState!=='visible'||!dev)return;
+  if(!dev.gatt.connected||!cmdC)reconnectNow();else refresh();
+  if($('awake').checked)keepAwake(true);
+});
+// Optional: keep the screen on while the app is open (costs phone battery).
+let wakeLock=null;
+async function keepAwake(on){
+  try{
+    if(on&&'wakeLock' in navigator){wakeLock=await navigator.wakeLock.request('screen')}
+    else if(wakeLock){await wakeLock.release();wakeLock=null}
+  }catch(e){toast('Couldn’t keep the screen on: '+e.message)}
 }
 $('go').onclick=async()=>{
   try{
@@ -295,6 +337,9 @@ function buildClips(){
 let advanced=false;
 try{advanced=localStorage.getItem('spookymatrix-advanced')==='1'}catch(e){}
 $('advanced').checked=advanced;
+try{$('awake').checked=localStorage.getItem('spookymatrix-awake')==='1'}catch(e){}
+$('awake').onchange=()=>{try{localStorage.setItem('spookymatrix-awake',$('awake').checked?'1':'0')}catch(e){}keepAwake($('awake').checked)};
+if($('awake').checked)keepAwake(true);
 $('advanced').onchange=()=>{advanced=$('advanced').checked;try{localStorage.setItem('spookymatrix-advanced',advanced?'1':'0')}catch(e){}showAdvanced()};
 function showAdvanced(){$('adv').hidden=!advanced||!cmdC;$('advrow').hidden=!cmdC}
 function seg(options,current,onPick){
