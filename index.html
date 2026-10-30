@@ -1,0 +1,244 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0d0a12">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon.svg">
+<title>SpookyMatrix BLE</title>
+<!-- Bluetooth remote for SpookyMatrix: playback, clip switching and clickers,
+     with no Wi-Fi. Web Bluetooth only runs on https pages, so host this folder
+     (e.g. GitHub Pages) rather than serving it from the costume. -->
+<style>
+:root{--bg:#0d0a12;--card:#191420;--line:#2f2639;--fg:#f1eaf7;--mut:#a295b3;--acc:#ff7a1a;--acc2:#8b5cf6;--bad:#ff4d6d}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{background:var(--bg);color:var(--fg)}
+body{margin:0;font:16px/1.4 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;padding:12px max(14px,env(safe-area-inset-right)) 32px max(14px,env(safe-area-inset-left))}
+main{max-width:720px;margin:0 auto}
+h1{font-size:22px;margin:4px 0 0}
+p{margin:6px 0}
+.mut{color:var(--mut);font-size:13px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:14px;margin:12px 0}
+.row{display:flex;gap:8px}
+.row>*{flex:1}
+.bar{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.spacer{flex:1}
+button{font:inherit;color:var(--fg);background:#2a2233;border:1px solid var(--line);border-radius:12px;padding:12px 10px;min-height:50px;cursor:pointer;touch-action:manipulation;-webkit-tap-highlight-color:transparent}
+button:active{transform:scale(.97)}
+button:disabled{opacity:.4}
+button.pri{background:var(--acc);border-color:var(--acc);color:#1c0e00;font-weight:650}
+button.on{background:#4a1d1d;border-color:var(--bad)}
+button.small{min-height:36px;padding:6px 12px}
+button.big{width:100%;min-height:72px;font-size:20px;margin-bottom:8px}
+.now{font-size:20px;font-weight:650;margin:2px 0 12px;word-break:break-word}
+.seg{display:flex;border:1px solid var(--line);border-radius:12px;overflow:hidden;margin-top:14px}
+.seg button{flex:1;border:0;border-radius:0;background:transparent;min-height:46px}
+.seg button.on{background:var(--acc2)}
+label{display:block;font-size:13px;color:var(--mut);margin:14px 0 6px}
+input[type=range]{width:100%;accent-color:var(--acc);height:34px;margin:0}
+input[type=number]{width:90px;font:inherit;color:var(--fg);background:#110d16;border:1px solid var(--line);border-radius:10px;padding:10px}
+.chk{display:flex;align-items:center;gap:8px;color:var(--fg);font-size:15px;margin:12px 0 0}
+.chk input{width:22px;height:22px;accent-color:var(--acc);margin:0;flex:none}
+#secsrow{margin-top:12px}
+h3{font-size:13px;color:var(--mut);font-weight:600;text-transform:uppercase;letter-spacing:.06em;margin:16px 0 6px}
+.clips{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:8px}
+.clips button{min-height:46px;text-align:left;font-size:15px;overflow-wrap:anywhere}
+.clips button.cur{border-color:var(--acc);box-shadow:inset 0 0 0 1px var(--acc);background:#3a2410}
+#toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:#000d;border:1px solid var(--line);padding:10px 16px;border-radius:12px;max-width:90vw}
+</style>
+</head>
+<body>
+<main>
+<h1>🎃 SpookyMatrix</h1>
+<div class="mut" id="sub">Not connected</div>
+
+<section class="card" id="connect">
+  <button id="go" class="pri big">Connect over Bluetooth</button>
+  <p class="mut"><b>First time:</b> switch the costume on (it accepts new phones for 2 minutes), tap Connect, pick SpookyMatrix, and type the PIN shown on the costume's panel. After that this phone reconnects by itself.</p>
+  <p class="mut" id="nobt" hidden>This browser has no Web Bluetooth. Use Chrome on Android (iPhone: the Bluefy app).</p>
+</section>
+
+<section class="card" id="ctl" hidden>
+  <div class="mut">Now playing</div>
+  <div class="now" id="now">—</div>
+  <button id="trig" class="pri big">Trigger</button>
+  <div class="row">
+    <button id="prev">⏮</button>
+    <button id="black">Blackout</button>
+    <button id="next">⏭</button>
+  </div>
+  <label for="bri">Brightness <span id="briv"></span></label>
+  <input type="range" id="bri" min="0" max="255">
+  <div class="seg" id="mode"><button data-m="0">Repeat</button><button data-m="1">Playlist</button><button data-m="2">Shuffle</button><button data-m="3">Loop + trigger</button></div>
+  <div class="bar" id="secsrow"><span id="secslabel"></span><input type="number" id="secs" min="3" max="3600" inputmode="numeric"><span class="mut">seconds</span></div>
+  <label class="chk" id="mediarow"><input type="checkbox" id="media">Watch / headphone buttons trigger</label>
+</section>
+
+<section class="card" id="cliplist" hidden>
+  <div class="bar"><b>Clips</b><span class="spacer"></span><span class="mut" id="clipcount"></span></div>
+  <div id="groups"></div>
+</section>
+
+<section class="card" id="clickers" hidden>
+  <b>Clickers</b>
+  <p class="mut">Up to two Bluetooth camera remotes, both working like the costume button. To add one: tap Pair, switch the clicker on and press its button within 60 s.</p>
+  <div class="bar"><span id="clk">—</span><span class="spacer"></span><button id="clkpair" class="small">Pair</button><button id="clkforget" class="small">Forget all</button></div>
+</section>
+<p class="mut">Uploading clips, roles and panel setup are on the Wi-Fi remote: join <b>SpookyMatrix</b> and open 192.168.4.1.</p>
+</main>
+<div id="toast" hidden></div>
+
+<script>
+const SVC='8f3a0001-5e2c-4c7b-9a6d-2b1f0c5e7a10',CMD='8f3a0002-5e2c-4c7b-9a6d-2b1f0c5e7a10',STA='8f3a0003-5e2c-4c7b-9a6d-2b1f0c5e7a10',CLP='8f3a0004-5e2c-4c7b-9a6d-2b1f0c5e7a10';
+const $=id=>document.getElementById(id);
+let dev=null,cmdC=null,staC=null,clpC=null,S=null,gatt=Promise.resolve(),briSent=0,briTimer=0,clips=[],clipsVersion=null,loadingClips=false;
+
+function toast(t){const e=$('toast');e.textContent=t;e.hidden=false;clearTimeout(e.t);e.t=setTimeout(()=>e.hidden=true,2500)}
+// Chrome allows one GATT operation at a time, so queue them.
+function queue(fn){const p=gatt.then(fn);gatt=p.catch(()=>{});return p}
+function send(cmd){if(!cmdC)return toast('Not connected');queue(()=>cmdC.writeValue(new TextEncoder().encode(cmd))).catch(e=>toast(e.message))}
+function refresh(){if(staC)queue(()=>staC.readValue()).then(v=>{S=JSON.parse(new TextDecoder().decode(v));render()}).catch(()=>{})}
+
+async function attach(){
+  $('sub').textContent='Connecting…';
+  const server=await dev.gatt.connect();
+  const svc=await server.getPrimaryService(SVC);
+  cmdC=await svc.getCharacteristic(CMD);
+  staC=await svc.getCharacteristic(STA);
+  try{clpC=await svc.getCharacteristic(CLP)}catch(e){clpC=null}  // older firmware has no clip list
+  staC.addEventListener('characteristicvaluechanged',refresh);
+  await staC.startNotifications();
+  clipsVersion=null;
+  $('connect').hidden=true;$('ctl').hidden=false;$('clickers').hidden=false;
+  $('sub').textContent='Connected over Bluetooth';
+  refresh();
+}
+async function reconnect(){
+  cmdC=staC=clpC=null;
+  for(let wait=1000;dev;wait=Math.min(wait*2,10000)){
+    $('sub').textContent='Connection lost, retrying…';
+    try{await attach();return}catch(e){}
+    await new Promise(r=>setTimeout(r,wait));
+  }
+}
+$('go').onclick=async()=>{
+  try{
+    dev=await navigator.bluetooth.requestDevice({filters:[{services:[SVC]}]});
+    dev.addEventListener('gattserverdisconnected',reconnect);
+    await attach();
+  }catch(e){
+    if(e.name!=='NotFoundError')toast(/auth|secur|pair|gatt/i.test(e.message)
+      ?'Couldn’t link. Is pairing open (first 2 min after switch-on, or Pair on the Wi-Fi remote)? Enter the PIN from the panel.'
+      :e.message);
+    dev=null;$('sub').textContent='Not connected';
+  }
+};
+if(!navigator.bluetooth){$('go').disabled=true;$('nobt').hidden=false}
+
+function render(){
+  if(!S)return;
+  $('now').textContent=S.black?'Blacked out':S.test?'Test pattern':(S.playing||'—').replace(/\.gif$/i,'');
+  $('black').classList.toggle('on',S.black);
+  const bri=$('bri');
+  if(document.activeElement!==bri){bri.max=S.maxBri;bri.value=S.bri}
+  $('briv').textContent=Math.round(bri.value*100/255)+'%';
+  document.querySelectorAll('#mode button').forEach(b=>b.classList.toggle('on',+b.dataset.m===S.mode));
+  if(document.activeElement!==$('secs'))$('secs').value=S.secs;
+  const react=S.mode===3;
+  $('secsrow').hidden=S.mode===0;
+  $('secslabel').textContent=react?'New loop every':'Next clip after';
+  $('trig').hidden=$('mediarow').hidden=!react;
+  $('next').classList.toggle('pri',!react);
+  const pair=S.pairing?' · pairing open':'';
+  $('clk').textContent=(!S.clkp?'No clickers paired':`${S.clk} of ${S.clkp} clicker${S.clkp>1?'s':''} connected`)+pair;
+  if(clpC&&S.cv!==clipsVersion&&!loadingClips)loadClips(S.cv);
+  document.querySelectorAll('#groups button').forEach(b=>b.classList.toggle('cur',b.dataset.n===S.playing&&!S.black));
+}
+
+// The clip list comes a page at a time: ask for "clips:<offset>", then read
+// "<offset>,<total>\n" followed by lines of "<role><name>".
+async function loadClips(version){
+  loadingClips=true;
+  try{
+    let text='',offset=0,total=1;
+    while(offset<total){
+      await queue(()=>cmdC.writeValue(new TextEncoder().encode('clips:'+offset)));
+      const page=new TextDecoder().decode(await queue(()=>clpC.readValue()));
+      const nl=page.indexOf('\n'),head=page.slice(0,nl).split(',');
+      const body=page.slice(nl+1);
+      if(+head[0]!==offset||!body.length&&offset<+head[1])throw new Error('clip list changed');
+      total=+head[1];text+=body;offset+=new TextEncoder().encode(body).length;
+    }
+    clips=text.split('\n').filter(Boolean).map(l=>({role:l[0],n:l.slice(1)}));
+    clipsVersion=version;buildClips();
+  }catch(e){clipsVersion=null}
+  loadingClips=false;
+}
+const GROUPS=[['l','Loops'],['s','Scares'],['e','Built-in effects'],['o','Not used in Loop + trigger']];
+function buildClips(){
+  const g=$('groups');g.textContent='';
+  $('cliplist').hidden=!clips.length;
+  $('clipcount').textContent=`${clips.length} clips · tap to play`;
+  GROUPS.forEach(([role,title])=>{
+    const list=clips.filter(c=>c.role===role);if(!list.length)return;
+    const h=document.createElement('h3');h.textContent=title;
+    const grid=document.createElement('div');grid.className='clips';
+    list.forEach(c=>{
+      const b=document.createElement('button');b.dataset.n=c.n;
+      b.textContent=(role==='e'?'✨ ':'')+c.n.replace(/\.gif$/i,'');
+      b.onclick=()=>send('play:'+c.n);
+      grid.append(b);
+    });
+    g.append(h,grid);
+  });
+  render();
+}
+
+let trigAt=0;
+function trigger(){const t=Date.now();if(t-trigAt<400)return;trigAt=t;send('trigger')}
+$('trig').onclick=trigger;
+$('prev').onclick=()=>send('prev');
+$('next').onclick=()=>send('next');
+$('black').onclick=()=>send('black');
+$('clkpair').onclick=()=>{send('pair');toast('Pairing for 60 s: switch the clicker on and press its button')};
+$('clkforget').onclick=()=>{send('forget');toast('Clickers forgotten. Pairing is open for 60 s')};
+$('bri').oninput=()=>{
+  const v=$('bri').value;$('briv').textContent=Math.round(v*100/255)+'%';
+  clearTimeout(briTimer);
+  const go=()=>{briSent=Date.now();send('bri:'+v)};
+  if(Date.now()-briSent>200)go();else briTimer=setTimeout(go,200);
+};
+document.querySelectorAll('#mode button').forEach(b=>b.onclick=()=>send(`mode:${b.dataset.m}:${$('secs').value||30}`));
+$('secs').onchange=()=>send(`mode:${S?S.mode:0}:${$('secs').value}`);
+
+// Media buttons: a looping silent track makes this page the phone's media
+// session, so play/pause and next/previous from a watch or headset reach it.
+let audio=null;
+function silentWav(seconds){
+  const rate=8000,n=rate*seconds,b=new ArrayBuffer(44+n),v=new DataView(b);
+  const str=(o,s)=>[...s].forEach((c,i)=>v.setUint8(o+i,c.charCodeAt(0)));
+  str(0,'RIFF');v.setUint32(4,36+n,true);str(8,'WAVEfmt ');v.setUint32(16,16,true);v.setUint16(20,1,true);v.setUint16(22,1,true);
+  v.setUint32(24,rate,true);v.setUint32(28,rate,true);v.setUint16(32,1,true);v.setUint16(34,8,true);str(36,'data');v.setUint32(40,n,true);
+  new Uint8Array(b,44).fill(128);
+  return URL.createObjectURL(new Blob([b],{type:'audio/wav'}));
+}
+const MEDIA_ACTIONS=['play','pause','nexttrack','previoustrack'];
+async function mediaButtons(on){
+  const ms=navigator.mediaSession;
+  if(!ms){toast('This browser can’t take media buttons');$('media').checked=false;return}
+  if(!on){if(audio)audio.pause();MEDIA_ACTIONS.forEach(a=>{try{ms.setActionHandler(a,null)}catch(e){}});ms.playbackState='none';return}
+  if(!audio){audio=new Audio(silentWav(10));audio.loop=true}
+  try{await audio.play()}catch(e){toast('Couldn’t start: '+e.message);$('media').checked=false;return}
+  ms.metadata=new MediaMetadata({title:'SpookyMatrix',artist:'Any media button triggers'});
+  MEDIA_ACTIONS.forEach(a=>{try{ms.setActionHandler(a,()=>{trigger();audio.play().catch(()=>{});ms.playbackState='playing'})}catch(e){}});
+  ms.playbackState='playing';
+  toast('Keep this page open');
+}
+$('media').onchange=()=>mediaButtons($('media').checked);
+
+if('serviceWorker' in navigator)navigator.serviceWorker.register('sw.js').catch(()=>{});
+</script>
+</body>
+</html>
