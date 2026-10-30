@@ -45,6 +45,9 @@ input[type=number]{width:90px;font:inherit;color:var(--fg);background:#110d16;bo
 h3{font-size:13px;color:var(--mut);font-weight:600;text-transform:uppercase;letter-spacing:.06em;margin:16px 0 6px}
 .clips{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:8px}
 .clips button{min-height:46px;text-align:left;font-size:15px;overflow-wrap:anywhere}
+.seg.aud{margin:0 0 12px}
+.seg.aud button.on{background:var(--acc)}
+.seg.aud button.on[data-a="0"]{background:#3fa34d}
 .clips button.cur{border-color:var(--acc);box-shadow:inset 0 0 0 1px var(--acc);background:#3a2410}
 #toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:#000d;border:1px solid var(--line);padding:10px 16px;border-radius:12px;max-width:90vw}
 </style>
@@ -68,6 +71,7 @@ h3{font-size:13px;color:var(--mut);font-weight:600;text-transform:uppercase;lett
 </section>
 
 <section class="card" id="ctl" hidden>
+  <div class="seg aud" id="aud"><button data-a="0">🧒 Kids</button><button data-a="1">💀 Adult</button></div>
   <div class="mut">Now playing</div>
   <div class="now" id="now">—</div>
   <button id="trig" class="pri big">Trigger</button>
@@ -200,6 +204,8 @@ function render(){
   if(document.activeElement!==bri){bri.max=S.maxBri;bri.value=S.bri}
   $('briv').textContent=Math.round(bri.value*100/255)+'%';
   document.querySelectorAll('#mode button').forEach(b=>b.classList.toggle('on',+b.dataset.m===S.mode));
+  document.querySelectorAll('#aud button').forEach(b=>b.classList.toggle('on',+b.dataset.a===S.aud));
+  if(S.aud!==shownAud&&clips.length)buildClips();
   if(document.activeElement!==$('secs'))$('secs').value=S.secs;
   const react=S.mode===3;
   $('secsrow').hidden=S.mode===0;
@@ -226,23 +232,27 @@ async function loadClips(version){
       if(+head[0]!==offset||!body.length&&offset<+head[1])throw new Error('clip list changed');
       total=+head[1];text+=body;offset+=new TextEncoder().encode(body).length;
     }
-    clips=text.split('\n').filter(Boolean).map(l=>({role:l[0],n:l.slice(1)}));
+    // "<k|a><l|s|o><e|->name": audience, role, built-in animation or not
+    clips=text.split('\n').filter(Boolean).map(l=>({aud:l[0]==='k'?0:1,role:l[1],fx:l[2]==='e',n:l.slice(3)}));
     clipsVersion=version;buildClips();
   }catch(e){clipsVersion=null}
   loadingClips=false;
 }
-const GROUPS=[['l','Loops'],['s','Scares'],['e','Built-in effects'],['o','Not used in Loop + trigger']];
+const GROUPS=[['l','Loops'],['s','Scares'],['o','Not used in Loop + trigger']];
+let shownAud=null;
 function buildClips(){
   const g=$('groups');g.textContent='';
+  shownAud=S?S.aud:0;
+  const mine=clips.filter(c=>c.aud===shownAud);  // only this audience's clips
   $('cliplist').hidden=!clips.length;
-  $('clipcount').textContent=`${clips.length} clips · tap to play`;
+  $('clipcount').textContent=`${mine.length} ${shownAud?'adult':'kids'} clips · tap to play`;
   GROUPS.forEach(([role,title])=>{
-    const list=clips.filter(c=>c.role===role);if(!list.length)return;
+    const list=mine.filter(c=>c.role===role);if(!list.length)return;
     const h=document.createElement('h3');h.textContent=title;
     const grid=document.createElement('div');grid.className='clips';
     list.forEach(c=>{
       const b=document.createElement('button');b.dataset.n=c.n;
-      b.textContent=(role==='e'?'✨ ':'')+c.n.replace(/\.gif$/i,'');
+      b.textContent=(c.fx?'✨ ':'')+c.n.replace(/\.gif$/i,'');
       b.onclick=()=>send('play:'+c.n);
       grid.append(b);
     });
@@ -254,6 +264,7 @@ function buildClips(){
 let trigAt=0;
 function trigger(){const t=Date.now();if(t-trigAt<400)return;trigAt=t;send('trigger')}
 $('trig').onclick=trigger;
+document.querySelectorAll('#aud button').forEach(b=>b.onclick=()=>send('aud:'+b.dataset.a));
 $('prev').onclick=()=>send('prev');
 $('next').onclick=()=>send('next');
 $('black').onclick=()=>send('black');
