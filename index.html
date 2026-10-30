@@ -46,6 +46,16 @@ h3{font-size:13px;color:var(--mut);font-weight:600;text-transform:uppercase;lett
 .clips{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:8px}
 .clips button{min-height:46px;text-align:left;font-size:15px;overflow-wrap:anywhere}
 .seg.aud{margin:0 0 12px}
+.tests{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.tests button{min-height:44px;padding:6px;font-size:14px}
+.mrow{border-top:1px solid var(--line);padding:10px 0 4px}
+.mrow .nm{font-weight:600;overflow-wrap:anywhere}
+.mrow .nm.off{opacity:.5;text-decoration:line-through}
+.mrow .ctl{display:flex;gap:6px;margin-top:6px;flex-wrap:wrap}
+.mrow .seg{margin:0;flex:1 1 auto}
+.mrow .seg button{min-height:36px;padding:4px 8px;font-size:13px}
+.mrow button.tog{min-height:36px;padding:4px 12px;font-size:13px;flex:0 0 auto}
+.mrow button.tog.on{background:#3fa34d;border-color:#3fa34d}
 .seg.aud button.on{background:var(--acc)}
 .seg.aud button.on[data-a="0"]{background:#3fa34d}
 .clips button.cur{border-color:var(--acc);box-shadow:inset 0 0 0 1px var(--acc);background:#3a2410}
@@ -97,7 +107,21 @@ h3{font-size:13px;color:var(--mut);font-weight:600;text-transform:uppercase;lett
   <p class="mut">Up to two Bluetooth camera remotes, both working like the costume button. To add one: tap Pair, switch the clicker on and press its button within 60 s.</p>
   <div class="bar"><span id="clk">—</span><span class="spacer"></span><button id="clkpair" class="small">Pair</button><button id="clkforget" class="small">Forget all</button></div>
 </section>
-<p class="mut">Uploading clips, roles and panel setup are on the Wi-Fi remote: join <b>SpookyMatrix</b> and open 192.168.4.1.</p>
+<section class="card" id="adv" hidden>
+  <b>Performance</b>
+  <p class="mut" id="perf">—</p>
+  <h3>Tests</h3>
+  <div class="tests"><button data-play="Refresh Test">Refresh test</button><button data-test="1">Layout</button><button data-test="2">Colours</button><button data-test="3">Gradient</button><button data-test="4">Row sweep</button><button data-test="0">Stop test</button></div>
+  <h3>Motion</h3>
+  <div class="seg" id="sens"><button data-s="0">Off</button><button data-s="1">Low</button><button data-s="2">Medium</button><button data-s="3">High</button></div>
+  <p class="mut">Calibrate with the costume on: step 1 standing straight, step 2 leaning so the right edge of the picture dips.</p>
+  <div class="row"><button id="cal1">1 · Straight</button><button id="cal2">2 · Leaning</button></div>
+  <h3>Clips</h3>
+  <p class="mut">Switch clips on or off, choose Kids or Adult, and their role in Loop + trigger.</p>
+  <div id="manage"></div>
+</section>
+<label class="chk" id="advrow" hidden><input type="checkbox" id="advanced">Advanced</label>
+<p class="mut">Uploading clips, renaming and panel setup are on the Wi-Fi remote: join <b>SpookyMatrix</b> and open 192.168.4.1.</p>
 </main>
 <div id="toast" hidden></div>
 
@@ -167,6 +191,7 @@ $('pin').onkeydown=e=>{if(e.key==='Enter')$('linkgo').click()};
 $('linkretry').onclick=async()=>{try{if(await login())linked()}catch(e){toast(e.message)}};
 async function reconnect(){
   cmdC=staC=clpC=rplC=null;
+  showAdvanced();
   for(let wait=1000;dev;wait=Math.min(wait*2,10000)){
     $('sub').textContent='Connection lost, retrying…';
     try{await attach();return}catch(e){}
@@ -205,6 +230,9 @@ function render(){
   $('briv').textContent=Math.round(bri.value*100/255)+'%';
   document.querySelectorAll('#mode button').forEach(b=>b.classList.toggle('on',+b.dataset.m===S.mode));
   document.querySelectorAll('#aud button').forEach(b=>b.classList.toggle('on',+b.dataset.a===S.aud));
+  document.querySelectorAll('#sens button').forEach(b=>b.classList.toggle('on',+b.dataset.s===S.sens));
+  $('perf').textContent=`${(S.fps||0).toFixed(1)} fps drawn · panel ${S.pfps||0}/s`+(S.dec?` · GIF ${S.dec} ms decode + ${S.pres} ms send per frame`:'');
+  showAdvanced();
   if(S.aud!==shownAud&&clips.length)buildClips();
   if(document.activeElement!==$('secs'))$('secs').value=S.secs;
   const react=S.mode===3;
@@ -233,7 +261,8 @@ async function loadClips(version){
       total=+head[1];text+=body;offset+=new TextEncoder().encode(body).length;
     }
     // "<k|a><l|s|o><e|->name": audience, role, built-in animation or not
-    clips=text.split('\n').filter(Boolean).map(l=>({aud:l[0]==='k'?0:1,role:l[1],fx:l[2]==='e',n:l.slice(3)}));
+    // "<k|a><l|s|o><e|t|-><-|x>name": audience, role, built-in / test / your own, on / off
+    clips=text.split('\n').filter(Boolean).map(l=>({aud:l[0]==='k'?0:1,role:l[1],fx:l[2]!=='-',test:l[2]==='t',off:l[3]==='x',n:l.slice(4)}));
     clipsVersion=version;buildClips();
   }catch(e){clipsVersion=null}
   loadingClips=false;
@@ -243,7 +272,7 @@ let shownAud=null;
 function buildClips(){
   const g=$('groups');g.textContent='';
   shownAud=S?S.aud:0;
-  const mine=clips.filter(c=>c.aud===shownAud);  // only this audience's clips
+  const mine=clips.filter(c=>c.aud===shownAud&&!c.off&&!c.test);  // this audience's clips that are switched on
   $('cliplist').hidden=!clips.length;
   $('clipcount').textContent=`${mine.length} ${shownAud?'adult':'kids'} clips · tap to play`;
   GROUPS.forEach(([role,title])=>{
@@ -258,8 +287,44 @@ function buildClips(){
     });
     g.append(h,grid);
   });
+  buildManage();
   render();
 }
+
+// ---- Advanced ----
+let advanced=false;
+try{advanced=localStorage.getItem('spookymatrix-advanced')==='1'}catch(e){}
+$('advanced').checked=advanced;
+$('advanced').onchange=()=>{advanced=$('advanced').checked;try{localStorage.setItem('spookymatrix-advanced',advanced?'1':'0')}catch(e){}showAdvanced()};
+function showAdvanced(){$('adv').hidden=!advanced||!cmdC;$('advrow').hidden=!cmdC}
+function seg(options,current,onPick){
+  const d=document.createElement('div');d.className='seg';
+  options.forEach(([label,value])=>{
+    const b=document.createElement('button');b.textContent=label;b.classList.toggle('on',value===current);
+    b.onclick=()=>onPick(value);d.append(b);
+  });
+  return d;
+}
+const ROLE={l:1,s:0,o:2};
+function buildManage(){
+  const m=$('manage');m.textContent='';
+  clips.filter(c=>!c.test).forEach(c=>{
+    const row=document.createElement('div');row.className='mrow';
+    const nm=document.createElement('div');nm.className='nm'+(c.off?' off':'');nm.textContent=(c.fx?'✨ ':'')+c.n.replace(/\.gif$/i,'');
+    const ctl=document.createElement('div');ctl.className='ctl';
+    const on=document.createElement('button');on.className='tog'+(c.off?'':' on');on.textContent=c.off?'Off':'On';
+    on.onclick=()=>send(`en:${c.off?1:0}:${c.n}`);
+    ctl.append(on,seg([['Kids',0],['Adult',1]],c.aud,a=>send(`caud:${a}:${c.n}`)),
+               seg([['Loop',1],['Scare',0],['Off',2]],ROLE[c.role],r=>send(`role:${r}:${c.n}`)));
+    row.append(nm,ctl);m.append(row);
+  });
+}
+document.querySelectorAll('#adv [data-test]').forEach(b=>b.onclick=()=>send('test:'+b.dataset.test));
+document.querySelectorAll('#adv [data-play]').forEach(b=>b.onclick=()=>send('play:'+b.dataset.play));
+document.querySelectorAll('#sens button').forEach(b=>b.onclick=()=>send('sens:'+b.dataset.s));
+async function calibrate(step){try{toast(await ask('cal:'+step))}catch(e){toast(e.message)}}
+$('cal1').onclick=()=>calibrate(1);
+$('cal2').onclick=()=>calibrate(2);
 
 let trigAt=0;
 function trigger(){const t=Date.now();if(t-trigAt<400)return;trigAt=t;send('trigger')}
