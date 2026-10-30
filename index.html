@@ -56,7 +56,7 @@ h3{font-size:13px;color:var(--mut);font-weight:600;text-transform:uppercase;lett
 
 <section class="card" id="connect">
   <button id="go" class="pri big">Connect over Bluetooth</button>
-  <p class="mut"><b>First time:</b> switch the costume on (it accepts new phones for 2 minutes), tap Connect, pick SpookyMatrix, and type the PIN that appears on the costume's panel. After that this phone logs in by itself.</p>
+  <p class="mut"><b>First time:</b> the costume accepts new phones for 2 minutes after switching on, or for 60 s after a triple-click of its button or a clicker. Tap Connect, pick SpookyMatrix, and type the PIN that appears on the costume's panel. After that this phone logs in by itself.</p>
   <p class="mut" id="nobt" hidden>This browser has no Web Bluetooth. Use Chrome on Android (iPhone: the Bluefy app).</p>
 </section>
 
@@ -139,7 +139,7 @@ async function login(){
   const pin=r==='pin';
   $('pinrow').hidden=!pin;$('linkretry').hidden=pin;
   $('linkmsg').textContent=pin?'Type the PIN now showing on the costume’s panel.'
-    :(key?'This phone’s link was replaced or removed. ':'')+'The costume isn’t accepting new phones right now: switch it off and on (or tap Pair on the Wi-Fi remote), then tap Try again.';
+    :(key?'This phone’s link was replaced or removed. ':'')+'The costume isn’t accepting new phones right now. Triple-click the costume button or a clicker (the panel shows PAIRING), or switch it off and on, then tap Try again.';
   $('sub').textContent='Connected, not linked yet';
   if(pin)$('pin').focus();
   return false;
