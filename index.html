@@ -172,8 +172,17 @@ async function reconnect(){
 $('go').onclick=async()=>{
   try{
     dev=await navigator.bluetooth.requestDevice({filters:[{services:[SVC]}]});
+    // Android often fails the first connection with a generic GATT error; a retry clears it.
+    for(let tries=1;;tries++){
+      try{await attach();break}
+      catch(e){
+        if(tries>=3)throw e;
+        $('sub').textContent=`Connecting… (try ${tries+1} of 3)`;
+        try{dev.gatt.disconnect()}catch(x){}
+        await new Promise(r=>setTimeout(r,1200));
+      }
+    }
     dev.addEventListener('gattserverdisconnected',reconnect);
-    await attach();
   }catch(e){
     if(e.name!=='NotFoundError')toast(/auth|secur|pair|gatt/i.test(e.message)
       ?'Couldn’t link. Is pairing open (first 2 min after switch-on, or Pair on the Wi-Fi remote)? Enter the PIN from the panel.'
