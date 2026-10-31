@@ -81,7 +81,7 @@ h3{font-size:13px;color:var(--mut);font-weight:600;text-transform:uppercase;lett
 </section>
 
 <section class="card" id="ctl" hidden>
-  <div class="seg aud" id="aud"><button data-a="0">🧒 Kids</button><button data-a="1">💀 Adult</button></div>
+  <div class="seg aud" id="aud"><button data-a="0">🧒 Kids</button><button data-a="1">💀 Scary</button></div>
   <div class="mut">Now playing</div>
   <div class="now" id="now">—</div>
   <button id="trig" class="pri big">Trigger</button>
@@ -120,7 +120,7 @@ h3{font-size:13px;color:var(--mut);font-weight:600;text-transform:uppercase;lett
   <p class="mut">Calibrate with the costume on: step 1 standing straight, step 2 leaning so the right edge of the picture dips.</p>
   <div class="row"><button id="cal1">1 · Straight</button><button id="cal2">2 · Leaning</button></div>
   <h3>Clips</h3>
-  <p class="mut">Switch clips on or off, choose Kids or Adult, and their role in Loop + trigger.</p>
+  <p class="mut">Switch clips on or off, choose Kids or Scary, and their role in Loop + trigger.</p>
   <div id="manage"></div>
 </section>
 <label class="chk" id="advrow" hidden><input type="checkbox" id="advanced">Advanced</label>
@@ -323,7 +323,7 @@ function buildClips(){
   shownAud=S?S.aud:0;
   const mine=clips.filter(c=>(c.aud===shownAud||c.aud===2)&&!c.off&&!c.test);  // this audience's (and Both) clips that are on
   $('cliplist').hidden=!clips.length;
-  $('clipcount').textContent=`${mine.length} ${shownAud?'adult':'kids'} clips · tap to play`;
+  $('clipcount').textContent=`${mine.length} ${shownAud?'scary':'kids'} clips · tap to play`;
   GROUPS.forEach(([role,title])=>{
     const list=mine.filter(c=>c.role===role);if(!list.length)return;
     const h=document.createElement('h3');h.textContent=title;
@@ -366,7 +366,7 @@ function buildManage(){
     const ctl=document.createElement('div');ctl.className='ctl';
     const on=document.createElement('button');on.className='tog'+(c.off?'':' on');on.textContent=c.off?'Off':'On';
     on.onclick=()=>send(`en:${c.off?1:0}:${c.n}`);
-    ctl.append(on,seg([['Kids',0],['Adult',1],['Both',2]],c.aud,a=>send(`caud:${a}:${c.n}`)),
+    ctl.append(on,seg([['Kids',0],['Scary',1],['Both',2]],c.aud,a=>send(`caud:${a}:${c.n}`)),
                seg([['Loop',1],['Scare',0],['Off',2]],ROLE[c.role],r=>send(`role:${r}:${c.n}`)));
     row.append(nm,ctl);m.append(row);
   });
