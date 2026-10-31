@@ -306,7 +306,7 @@ async function loadClips(version){
     }
     // "<k|a><l|s|o><e|->name": audience, role, built-in animation or not
     // "<k|a><l|s|o><e|t|-><-|x>name": audience, role, built-in / test / your own, on / off
-    clips=text.split('\n').filter(Boolean).map(l=>({aud:l[0]==='k'?0:1,role:l[1],fx:l[2]!=='-',test:l[2]==='t',off:l[3]==='x',n:l.slice(4)}));
+    clips=text.split('\n').filter(Boolean).map(l=>({aud:'kab'.indexOf(l[0]),role:l[1],fx:l[2]!=='-',test:l[2]==='t',off:l[3]==='x',n:l.slice(4)}));
     clipsVersion=version;buildClips();
   }catch(e){clipsVersion=null}
   loadingClips=false;
@@ -316,7 +316,7 @@ let shownAud=null;
 function buildClips(){
   const g=$('groups');g.textContent='';
   shownAud=S?S.aud:0;
-  const mine=clips.filter(c=>c.aud===shownAud&&!c.off&&!c.test);  // this audience's clips that are switched on
+  const mine=clips.filter(c=>(c.aud===shownAud||c.aud===2)&&!c.off&&!c.test);  // this audience's (and Both) clips that are on
   $('cliplist').hidden=!clips.length;
   $('clipcount').textContent=`${mine.length} ${shownAud?'adult':'kids'} clips · tap to play`;
   GROUPS.forEach(([role,title])=>{
@@ -361,7 +361,7 @@ function buildManage(){
     const ctl=document.createElement('div');ctl.className='ctl';
     const on=document.createElement('button');on.className='tog'+(c.off?'':' on');on.textContent=c.off?'Off':'On';
     on.onclick=()=>send(`en:${c.off?1:0}:${c.n}`);
-    ctl.append(on,seg([['Kids',0],['Adult',1]],c.aud,a=>send(`caud:${a}:${c.n}`)),
+    ctl.append(on,seg([['Kids',0],['Adult',1],['Both',2]],c.aud,a=>send(`caud:${a}:${c.n}`)),
                seg([['Loop',1],['Scare',0],['Off',2]],ROLE[c.role],r=>send(`role:${r}:${c.n}`)));
     row.append(nm,ctl);m.append(row);
   });

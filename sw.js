@@ -1,5 +1,5 @@
 // Network first, cached copy when offline, so the remote still opens at a party with no signal.
-const CACHE = 'spooky-ble-11';
+const CACHE = 'spooky-ble-12';
 
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(['./', 'manifest.webmanifest', 'icon.svg'])).then(() => self.skipWaiting()));
