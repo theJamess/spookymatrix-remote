@@ -115,6 +115,14 @@ h3{font-size:13px;color:var(--mut);font-weight:600;text-transform:uppercase;lett
   <p class="mut" id="perf">—</p>
   <h3>Tests</h3>
   <div class="tests"><button data-play="Refresh Test">Refresh test</button><button data-test="1">Layout</button><button data-test="2">Colours</button><button data-test="3">Gradient</button><button data-test="4">Row sweep</button><button data-test="0">Stop test</button></div>
+  <div id="shapes">
+  <h3>Colour flash tests</h3>
+  <p class="mut">⚠ Fast full-panel flashing: don't run these near anyone sensitive to flashing lights. Play any clip to stop.</p>
+  <div class="tests"><button data-play="Colour Flash">Colour flash</button><button data-play="Colour Shapes">Colour shapes</button></div>
+  <label for="shsz" style="display:block;margin-top:10px">Average shape size <span id="shszv"></span> px</label>
+  <input type="range" id="shsz" min="3" max="100" style="width:100%">
+  <div class="seg" id="shty" style="margin-top:8px"><button data-t="0">Squares</button><button data-t="1">Rectangles</button><button data-t="2">Stripes</button><button data-t="3">Blobs</button></div>
+  </div>
   <h3>Motion</h3>
   <div class="seg" id="sens"><button data-s="0">Off</button><button data-s="1">Low</button><button data-s="2">Medium</button><button data-s="3">High</button></div>
   <p class="mut">Calibrate with the costume on: step 1 standing straight, step 2 leaning so the right edge of the picture dips.</p>
@@ -288,6 +296,8 @@ function render(){
   $('trig').hidden=$('mediarow').hidden=$('flarerow').hidden=$('lorder').hidden=!react;
   if(document.activeElement!==$('flare'))$('flare').checked=!!S.flare;
   document.querySelectorAll('#lorder button').forEach(b=>b.classList.toggle('on',+b.dataset.o===(S.lorder?1:0)));
+  if(S.shp){if(document.activeElement!==$('shsz'))$('shsz').value=S.shp[0];$('shszv').textContent=$('shsz').value;
+    document.querySelectorAll('#shty button').forEach(b=>b.classList.toggle('on',+b.dataset.t===S.shp[1]));}
   $('next').classList.toggle('pri',!react);
   const pair=S.pairing?' · pairing open':'';
   $('clk').textContent=(!S.clkp?'No clickers paired':`${S.clk} of ${S.clkp} clicker${S.clkp>1?'s':''} connected`)+pair;
@@ -384,6 +394,10 @@ $('trig').onclick=trigger;
 $('flare').onchange=()=>send('flare:'+($('flare').checked?1:0));
 $('msg').onchange=()=>send('msg:'+$('msg').value);
 document.querySelectorAll('#lorder button').forEach(b=>b.onclick=()=>send('lorder:'+b.dataset.o));
+function sendShapes(t){send(`shapes:${$('shsz').value}:${t??(S&&S.shp?S.shp[1]:0)}`)}
+$('shsz').oninput=()=>$('shszv').textContent=$('shsz').value;
+$('shsz').onchange=()=>sendShapes();
+document.querySelectorAll('#shty button').forEach(b=>b.onclick=()=>sendShapes(b.dataset.t));
 document.querySelectorAll('#aud button').forEach(b=>b.onclick=()=>send('aud:'+b.dataset.a));
 $('prev').onclick=()=>send('prev');
 $('next').onclick=()=>send('next');
