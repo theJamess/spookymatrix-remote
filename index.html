@@ -85,6 +85,7 @@ h3{font-size:13px;color:var(--mut);font-weight:600;text-transform:uppercase;lett
   <div class="mut">Now playing</div>
   <div class="now" id="now">—</div>
   <button id="trig" class="pri big">Trigger</button>
+  <div class="seg" id="lorder" style="margin-top:8px"><button data-o="0">Shuffle loops</button><button data-o="1">Loops in order</button></div>
   <div class="row">
     <button id="prev">⏮</button>
     <button id="black">Blackout</button>
@@ -96,7 +97,6 @@ h3{font-size:13px;color:var(--mut);font-weight:600;text-transform:uppercase;lett
   <div class="bar" id="msgrow" hidden><input type="text" id="msg" maxlength="63" placeholder="HAPPY HALLOWEEN" style="flex:1"></div>
   <div class="bar" id="secsrow"><span id="secslabel"></span><input type="number" id="secs" min="3" max="3600" inputmode="numeric"><span class="mut">seconds</span></div>
   <label class="chk" id="flarerow"><input type="checkbox" id="flare">Flare on trigger (loops at 30%, triggers up to full in ½ s)</label>
-  <label class="chk" id="lorderrow"><input type="checkbox" id="lorder">Loops in clip order (off: shuffled)</label>
   <label class="chk" id="mediarow"><input type="checkbox" id="media">Watch / headphone buttons trigger</label>
 </section>
 
@@ -285,9 +285,9 @@ function render(){
   $('msgrow').hidden=S.mode!==4;
   if(document.activeElement!==$('msg'))$('msg').value=S.msg||'';
   $('secslabel').textContent=react?'New loop every':'Next clip after';
-  $('trig').hidden=$('mediarow').hidden=$('flarerow').hidden=$('lorderrow').hidden=!react;
+  $('trig').hidden=$('mediarow').hidden=$('flarerow').hidden=$('lorder').hidden=!react;
   if(document.activeElement!==$('flare'))$('flare').checked=!!S.flare;
-  if(document.activeElement!==$('lorder'))$('lorder').checked=!!S.lorder;
+  document.querySelectorAll('#lorder button').forEach(b=>b.classList.toggle('on',+b.dataset.o===(S.lorder?1:0)));
   $('next').classList.toggle('pri',!react);
   const pair=S.pairing?' · pairing open':'';
   $('clk').textContent=(!S.clkp?'No clickers paired':`${S.clk} of ${S.clkp} clicker${S.clkp>1?'s':''} connected`)+pair;
@@ -383,7 +383,7 @@ function trigger(){const t=Date.now();if(t-trigAt<400)return;trigAt=t;send('trig
 $('trig').onclick=trigger;
 $('flare').onchange=()=>send('flare:'+($('flare').checked?1:0));
 $('msg').onchange=()=>send('msg:'+$('msg').value);
-$('lorder').onchange=()=>send('lorder:'+($('lorder').checked?1:0));
+document.querySelectorAll('#lorder button').forEach(b=>b.onclick=()=>send('lorder:'+b.dataset.o));
 document.querySelectorAll('#aud button').forEach(b=>b.onclick=()=>send('aud:'+b.dataset.a));
 $('prev').onclick=()=>send('prev');
 $('next').onclick=()=>send('next');
