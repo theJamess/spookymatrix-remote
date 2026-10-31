@@ -95,6 +95,7 @@ h3{font-size:13px;color:var(--mut);font-weight:600;text-transform:uppercase;lett
   <div class="seg" id="mode"><button data-m="0">Repeat</button><button data-m="1">Playlist</button><button data-m="2">Shuffle</button><button data-m="3">Loop + trigger</button></div>
   <div class="bar" id="secsrow"><span id="secslabel"></span><input type="number" id="secs" min="3" max="3600" inputmode="numeric"><span class="mut">seconds</span></div>
   <label class="chk" id="flarerow"><input type="checkbox" id="flare">Flare on trigger (loops at 30%, triggers up to full in ½ s)</label>
+  <label class="chk" id="lorderrow"><input type="checkbox" id="lorder">Loops in clip order (off: shuffled)</label>
   <label class="chk" id="mediarow"><input type="checkbox" id="media">Watch / headphone buttons trigger</label>
 </section>
 
@@ -281,8 +282,9 @@ function render(){
   const react=S.mode===3;
   $('secsrow').hidden=S.mode===0;
   $('secslabel').textContent=react?'New loop every':'Next clip after';
-  $('trig').hidden=$('mediarow').hidden=$('flarerow').hidden=!react;
+  $('trig').hidden=$('mediarow').hidden=$('flarerow').hidden=$('lorderrow').hidden=!react;
   if(document.activeElement!==$('flare'))$('flare').checked=!!S.flare;
+  if(document.activeElement!==$('lorder'))$('lorder').checked=!!S.lorder;
   $('next').classList.toggle('pri',!react);
   const pair=S.pairing?' · pairing open':'';
   $('clk').textContent=(!S.clkp?'No clickers paired':`${S.clk} of ${S.clkp} clicker${S.clkp>1?'s':''} connected`)+pair;
@@ -377,6 +379,7 @@ let trigAt=0;
 function trigger(){const t=Date.now();if(t-trigAt<400)return;trigAt=t;send('trigger')}
 $('trig').onclick=trigger;
 $('flare').onchange=()=>send('flare:'+($('flare').checked?1:0));
+$('lorder').onchange=()=>send('lorder:'+($('lorder').checked?1:0));
 document.querySelectorAll('#aud button').forEach(b=>b.onclick=()=>send('aud:'+b.dataset.a));
 $('prev').onclick=()=>send('prev');
 $('next').onclick=()=>send('next');
