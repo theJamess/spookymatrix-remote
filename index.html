@@ -92,7 +92,8 @@ h3{font-size:13px;color:var(--mut);font-weight:600;text-transform:uppercase;lett
   </div>
   <label for="bri">Brightness <span id="briv"></span></label>
   <input type="range" id="bri" min="0" max="255">
-  <div class="seg" id="mode"><button data-m="0">Repeat</button><button data-m="1">Playlist</button><button data-m="2">Shuffle</button><button data-m="3">Loop + trigger</button></div>
+  <div class="seg" id="mode"><button data-m="0">Repeat</button><button data-m="1">Playlist</button><button data-m="2">Shuffle</button><button data-m="3">Loop + trigger</button><button data-m="4">Message</button></div>
+  <div class="bar" id="msgrow" hidden><input type="text" id="msg" maxlength="63" placeholder="HAPPY HALLOWEEN" style="flex:1"></div>
   <div class="bar" id="secsrow"><span id="secslabel"></span><input type="number" id="secs" min="3" max="3600" inputmode="numeric"><span class="mut">seconds</span></div>
   <label class="chk" id="flarerow"><input type="checkbox" id="flare">Flare on trigger (loops at 30%, triggers up to full in ½ s)</label>
   <label class="chk" id="lorderrow"><input type="checkbox" id="lorder">Loops in clip order (off: shuffled)</label>
@@ -280,7 +281,9 @@ function render(){
   if(S.aud!==shownAud&&clips.length)buildClips();
   if(document.activeElement!==$('secs'))$('secs').value=S.secs;
   const react=S.mode===3;
-  $('secsrow').hidden=S.mode===0;
+  $('secsrow').hidden=S.mode===0||S.mode===4;
+  $('msgrow').hidden=S.mode!==4;
+  if(document.activeElement!==$('msg'))$('msg').value=S.msg||'';
   $('secslabel').textContent=react?'New loop every':'Next clip after';
   $('trig').hidden=$('mediarow').hidden=$('flarerow').hidden=$('lorderrow').hidden=!react;
   if(document.activeElement!==$('flare'))$('flare').checked=!!S.flare;
@@ -379,6 +382,7 @@ let trigAt=0;
 function trigger(){const t=Date.now();if(t-trigAt<400)return;trigAt=t;send('trigger')}
 $('trig').onclick=trigger;
 $('flare').onchange=()=>send('flare:'+($('flare').checked?1:0));
+$('msg').onchange=()=>send('msg:'+$('msg').value);
 $('lorder').onchange=()=>send('lorder:'+($('lorder').checked?1:0));
 document.querySelectorAll('#aud button').forEach(b=>b.onclick=()=>send('aud:'+b.dataset.a));
 $('prev').onclick=()=>send('prev');
